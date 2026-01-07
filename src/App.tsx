@@ -6,7 +6,10 @@ const theme = createTheme({
   palette: {
     primary: { main: '#1976d2' },
     secondary: { main: '#dc004e' },
-    background: { default: '#f5f5f5' },
+    background: { default: '#f8f9fa' },
+  },
+  typography: {
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
   },
 });
 
