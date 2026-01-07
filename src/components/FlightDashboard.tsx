@@ -13,6 +13,7 @@ import TableRow from '@mui/material/TableRow';
 import SearchIcon from '@mui/icons-material/Search';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { fetchFlights, Flight } from '../services/flightAPI';
+import Chip from '@mui/material/Chip';
 
 const FlightDashboard: React.FC = () => {
   const [flights, setFlights] = useState<Flight[]>([]);
@@ -119,46 +120,89 @@ const FlightDashboard: React.FC = () => {
         <Typography variant="h6" gutterBottom>
           Available Flights
         </Typography>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Flight</TableCell>
-                <TableCell>Airline</TableCell>
-                <TableCell>Route</TableCell>
-                <TableCell align="right">Price</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredFlights.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    No flights found. Try a different search.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredFlights.map((flight) => (
-                  <TableRow key={flight.id}>
-                    <TableCell>
-                      <Typography fontWeight="bold">
-                        {flight.flight_number}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{flight.airline}</TableCell>
-                    <TableCell>
-                      {flight.departure.airport} → {flight.arrival.airport}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="h6" color="primary">
-                        ${flight.price}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ))
+       <TableContainer>
+  <Table>
+    <TableHead>
+      <TableRow>
+        <TableCell>Flight</TableCell>
+        <TableCell>Airline</TableCell>
+        <TableCell>Route</TableCell>
+        <TableCell align="right">Price</TableCell>
+        <TableCell align="center">API Status</TableCell> {/* ✅ NEW COLUMN */}
+        <TableCell align="center">Source</TableCell> {/* ✅ NEW COLUMN */}
+      </TableRow>
+    </TableHead>
+    <TableBody>
+      {filteredFlights.length === 0 ? (
+        <TableRow>
+          <TableCell colSpan={6} align="center"> {/* Updated colSpan */}
+            No flights found. Try a different search.
+          </TableCell>
+        </TableRow>
+      ) : (
+        filteredFlights.map((flight) => (
+          <TableRow key={flight.id}>
+            <TableCell>
+              <Typography fontWeight="bold">
+                {flight.flight_number}
+              </Typography>
+              {flight.flight_status && (
+                <Typography variant="caption" color="text.secondary">
+                  {flight.flight_status}
+                </Typography>
               )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+            </TableCell>
+            <TableCell>{flight.airline}</TableCell>
+            <TableCell>
+              <Box>
+                <Typography>
+                  {flight.departure.airport} → {flight.arrival.airport}
+                </Typography>
+                {flight.departure.iata && flight.arrival.iata && (
+                  <Typography variant="caption" color="primary">
+                    {flight.departure.iata}-{flight.arrival.iata}
+                  </Typography>
+                )}
+              </Box>
+            </TableCell>
+            <TableCell align="right">
+              <Typography variant="h6" color="primary">
+                ${flight.price}
+              </Typography>
+            </TableCell>
+            <TableCell align="center">
+              <Box sx={{ 
+                display: 'inline-block',
+                px: 1,
+                py: 0.5,
+                borderRadius: 1,
+                bgcolor: flight.live_status?.includes('Live') ? '#e8f5e9' : 
+                         flight.live_status?.includes('Demo') ? '#fff8e1' : '#f5f5f5',
+                color: flight.live_status?.includes('Live') ? '#2e7d32' : '#666'
+              }}>
+                {flight.live_status || 'N/A'}
+              </Box>
+              {flight.last_updated && flight.last_updated !== 'Static' && (
+                <Typography variant="caption" display="block" color="text.secondary">
+                  Updated: {flight.last_updated}
+                </Typography>
+              )}
+            </TableCell>
+            <TableCell align="center">
+              <Chip 
+                label={flight.data_source || 'mock'}
+                size="small"
+                color={flight.data_source === 'api' ? 'success' : 
+                       flight.data_source === 'synthetic' ? 'warning' : 'default'}
+                variant="outlined"
+              />
+            </TableCell>
+          </TableRow>
+        ))
+      )}
+    </TableBody>
+  </Table>
+</TableContainer>
       </Paper>
     </Box>
   );
