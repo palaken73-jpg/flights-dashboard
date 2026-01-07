@@ -36,54 +36,62 @@ export const fetchFlights = async (params: {
   date?: string;
 }): Promise<Flight[]> => {
   try {
-    // If no API key or we want to use mock for development
-    if (!AVIATIONSTACK_API_KEY || AVIATIONSTACK_API_KEY === 'f8259de386dd26e25e0c595ef4ecbb82') {
-      console.log('Using mock flight data');
-      return MOCK_FLIGHTS;
-    }
-
-    const response = await axios.get(`${AVIATIONSTACK_BASE_URL}/flights`, {
-      params: {
-        access_key: AVIATIONSTACK_API_KEY,
-        dep_iata: params.origin,
-        arr_iata: params.destination,
-        flight_date: params.date,
-        limit: 10
-      }
-    });
-
-    // Transform API response to our format
-    return response.data.data.map((flight: any) => ({
-      id: flight.flight.iata,
-      flight_number: flight.flight.number,
-      airline: flight.airline.name,
-      departure: {
-        airport: flight.departure.airport,
-        scheduled: flight.departure.scheduled
-      },
-      arrival: {
-        airport: flight.arrival.airport,
-        scheduled: flight.arrival.scheduled
-      },
-      price: Math.floor(Math.random() * 500) + 150, // Mock price since API doesn't provide
-      currency: 'USD',
-      date: flight.flight_date
-    }));
-  } catch (error) {
-    console.error('Error fetching flights:', error);
-    return MOCK_FLIGHTS; // Fallback to mock data
-  }
-};
-
-// Simulate price history for charts
-export const generatePriceHistory = (flightId: string, days: number = 30) => {
-  const basePrice = Math.floor(Math.random() * 300) + 200;
-  const history = [];
-  
-  for (let i = days; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 600));
     
+    // Filter mock data based on search params
+    let results = MOCK_FLIGHTS.filter(flight => {
+      let match = true;
+      
+      if (params.origin) {
+        match = match && flight.departure.airport
+          .toLowerCase()
+          .includes(params.origin.toLowerCase());
+      }
+      
+      if (params.destination) {
+        match = match && flight.arrival.airport
+          .toLowerCase()
+          .includes(params.destination.toLowerCase());
+      }
+      
+      if (params.date) {
+        match = match && flight.date === params.date;
+      }
+      
+      return match;
+    });
+    
+    // If no results, return all flights with a message
+    if (results.length === 0 && (params.origin || params.destination)) {
+      // Add a "no results" flight
+      results = [{
+        id: 'no-results',
+        flight_number: 'N/A',
+        airline: 'No flights found',
+        departure: { 
+          airport: params.origin || 'Any', 
+          scheduled: new Date().toISOString() 
+        },
+        arrival: { 
+          airport: params.destination || 'Any', 
+          scheduled: new Date().toISOString() 
+        },
+        price: 0,
+        currency: 'USD',
+        date: params.date || new Date().toISOString().split('T')[0]
+      }];
+    } else if (results.length === 0) {
+      results = MOCK_FLIGHTS;
+    }
+    
+    return results;
+    
+  } catch (error) {
+    console.error('Error:', error);
+    return MOCK_FLIGHTS;
+  }
+};    
     // Simulate price fluctuations
     const fluctuation = (Math.random() - 0.5) * 50;
     const price = Math.max(150, basePrice + fluctuation);
