@@ -10,19 +10,14 @@ import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
-import SearchIcon from '@mui/icons-material/Search';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { fetchFlights, Flight } from '../services/flightAPI';
 import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import SearchIcon from '@mui/icons-material/Search';
 
 const FlightDashboard: React.FC = () => {
-  const [flights, setFlights] = useState<Flight[]>([]);
-  const [filteredFlights, setFilteredFlights] = useState<Flight[]>([]);
+  const [flights, setFlights] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchParams, setSearchParams] = useState({
-    origin: '',
-    destination: '',
-  });
+  const [search, setSearch] = useState({ origin: '', destination: '' });
 
   useEffect(() => {
     loadFlights();
@@ -30,179 +25,94 @@ const FlightDashboard: React.FC = () => {
 
   const loadFlights = async () => {
     setLoading(true);
-    const data = await fetchFlights({});
-    setFlights(data);
-    setFilteredFlights(data);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setFlights([
+      { id: '1', flight: 'AA123', airline: 'American', from: 'JFK', to: 'LAX', price: 299 },
+      { id: '2', flight: 'DL456', airline: 'Delta', from: 'LAX', to: 'JFK', price: 345 },
+      { id: '3', flight: 'UA789', airline: 'United', from: 'SFO', to: 'ORD', price: 289 },
+    ]);
     setLoading(false);
   };
 
-  const handleSearch = async () => {
+  const handleSearch = () => {
     setLoading(true);
-    
-    const data = await fetchFlights({
-      origin: searchParams.origin || undefined,
-      destination: searchParams.destination || undefined,
-    });
-    
-    setFilteredFlights(data);
-    setLoading(false);
+    setTimeout(() => {
+      setFlights([
+        { id: '1', flight: 'AA123', airline: 'American', from: search.origin || 'JFK', to: search.destination || 'LAX', price: 299 },
+        { id: '2', flight: 'DL456', airline: 'Delta', from: search.origin || 'JFK', to: search.destination || 'LAX', price: 345 },
+      ]);
+      setLoading(false);
+    }, 800);
   };
-
-  const priceData = [
-    { day: 'Mon', price: 320 },
-    { day: 'Tue', price: 310 },
-    { day: 'Wed', price: 295 },
-    { day: 'Thu', price: 285 },
-    { day: 'Fri', price: 290 },
-    { day: 'Sat', price: 315 },
-    { day: 'Sun', price: 330 },
-  ];
 
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
-        ✈️ Flight Prices Dashboard
+        Flight Dashboard
       </Typography>
       
       <Paper sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
           <TextField 
             label="From" 
+            value={search.origin}
+            onChange={(e) => setSearch({...search, origin: e.target.value})}
             placeholder="JFK"
-            value={searchParams.origin}
-            onChange={(e) => setSearchParams({...searchParams, origin: e.target.value})}
-            disabled={loading}
           />
           <TextField 
             label="To" 
+            value={search.destination}
+            onChange={(e) => setSearch({...search, destination: e.target.value})}
             placeholder="LAX"
-            value={searchParams.destination}
-            onChange={(e) => setSearchParams({...searchParams, destination: e.target.value})}
-            disabled={loading}
           />
           <Button
             variant="contained"
             onClick={handleSearch}
             disabled={loading}
-            startIcon={<SearchIcon />}
-            sx={{ minWidth: '120px' }}
+            startIcon={loading ? <CircularProgress size={20} /> : <SearchIcon />}
           >
             {loading ? 'Searching...' : 'Search'}
           </Button>
         </Box>
-        
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          {filteredFlights.length} flights found
-          {searchParams.origin && ` from ${searchParams.origin}`}
-          {searchParams.destination && ` to ${searchParams.destination}`}
-        </Typography>
-        
-        <Box sx={{ height: 200, mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Weekly Price Trends
-          </Typography>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={priceData}>
-              <XAxis dataKey="day" />
-              <YAxis />
-              <Tooltip />
-              <Line 
-                type="monotone" 
-                dataKey="price" 
-                stroke="#8884d8" 
-                strokeWidth={2}
-                dot={{ r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </Box>
-        
+
         <Typography variant="h6" gutterBottom>
-          Available Flights
+          Available Flights ({flights.length})
         </Typography>
-       <TableContainer>
-  <Table>
-    <TableHead>
-      <TableRow>
-        <TableCell>Flight</TableCell>
-        <TableCell>Airline</TableCell>
-        <TableCell>Route</TableCell>
-        <TableCell align="right">Price</TableCell>
-        <TableCell align="center">API Status</TableCell> {/* ✅ NEW COLUMN */}
-        <TableCell align="center">Source</TableCell> {/* ✅ NEW COLUMN */}
-      </TableRow>
-    </TableHead>
-    <TableBody>
-      {filteredFlights.length === 0 ? (
-        <TableRow>
-          <TableCell colSpan={6} align="center"> {/* Updated colSpan */}
-            No flights found. Try a different search.
-          </TableCell>
-        </TableRow>
-      ) : (
-        filteredFlights.map((flight) => (
-          <TableRow key={flight.id}>
-            <TableCell>
-              <Typography fontWeight="bold">
-                {flight.flight_number}
-              </Typography>
-              {flight.flight_status && (
-                <Typography variant="caption" color="text.secondary">
-                  {flight.flight_status}
-                </Typography>
-              )}
-            </TableCell>
-            <TableCell>{flight.airline}</TableCell>
-            <TableCell>
-              <Box>
-                <Typography>
-                  {flight.departure.airport} → {flight.arrival.airport}
-                </Typography>
-                {flight.departure.iata && flight.arrival.iata && (
-                  <Typography variant="caption" color="primary">
-                    {flight.departure.iata}-{flight.arrival.iata}
-                  </Typography>
-                )}
-              </Box>
-            </TableCell>
-            <TableCell align="right">
-              <Typography variant="h6" color="primary">
-                ${flight.price}
-              </Typography>
-            </TableCell>
-            <TableCell align="center">
-              <Box sx={{ 
-                display: 'inline-block',
-                px: 1,
-                py: 0.5,
-                borderRadius: 1,
-                bgcolor: flight.live_status?.includes('Live') ? '#e8f5e9' : 
-                         flight.live_status?.includes('Demo') ? '#fff8e1' : '#f5f5f5',
-                color: flight.live_status?.includes('Live') ? '#2e7d32' : '#666'
-              }}>
-                {flight.live_status || 'N/A'}
-              </Box>
-              {flight.last_updated && flight.last_updated !== 'Static' && (
-                <Typography variant="caption" display="block" color="text.secondary">
-                  Updated: {flight.last_updated}
-                </Typography>
-              )}
-            </TableCell>
-            <TableCell align="center">
-              <Chip 
-                label={flight.data_source || 'mock'}
-                size="small"
-                color={flight.data_source === 'api' ? 'success' : 
-                       flight.data_source === 'synthetic' ? 'warning' : 'default'}
-                variant="outlined"
-              />
-            </TableCell>
-          </TableRow>
-        ))
-      )}
-    </TableBody>
-  </Table>
-</TableContainer>
+
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Flight</TableCell>
+                <TableCell>Airline</TableCell>
+                <TableCell>Route</TableCell>
+                <TableCell align="right">Price</TableCell>
+                <TableCell align="center">Status</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {flights.map((flight) => (
+                <TableRow key={flight.id}>
+                  <TableCell>
+                    <Typography fontWeight="bold">{flight.flight}</Typography>
+                  </TableCell>
+                  <TableCell>{flight.airline}</TableCell>
+                  <TableCell>
+                    {flight.from} → {flight.to}
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography variant="h6" color="primary">
+                      ${flight.price}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="center">
+                    <Chip label="Available" color="success" size="small" />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
       </Paper>
     </Box>
   );

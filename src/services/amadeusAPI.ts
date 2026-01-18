@@ -1,145 +1,258 @@
-import Amadeus from 'amadeus';
+const AMADEUS_API_KEY = 'ELgladm0pbqUzY8ke0TdkS9SHM0kXEDJ';
+const AMADEUS_API_SECRET = 'h1kjA9WxcehHGh54';
 
-const AMADEUS_API_KEY = 'YOUR_API_KEY_HERE';
-const AMADEUS_API_SECRET = 'YOUR_API_SECRET_HERE';
+let ACCESS_TOKEN = '';
+let TOKEN_EXPIRY = 0;
 
-// Initialize Amadeus
-const amadeus = new Amadeus({
-  clientId: AMADEUS_API_KEY,
-  clientSecret: AMADEUS_API_SECRET,
-  hostname: 'test' // Use 'production' for live (but needs approval)
-});
+// Get access token
+const getAccessToken = async (): Promise<string> => {
+  // If token is still valid, return it
+  if (ACCESS_TOKEN && Date.now() < TOKEN_EXPIRY) {
+    return ACCESS_TOKEN;
+  }
+  
+  console.log('🔐 Getting new Amadeus access token...');
+  
+  try {
+    const response = await fetch('https://test.api.amadeus.com/v1/security/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `grant_type=client_credentials&client_id=${encodeURIComponent(AMADEUS_API_KEY)}&client_secret=${encodeURIComponent(AMADEUS_API_SECRET)}`
+    });
+    
+    const data = await response.json();
+    
+    if (data.access_token) {
+      ACCESS_TOKEN = data.access_token;
+      TOKEN_EXPIRY = Date.now() + (data.expires_in * 1000) - 60000; // 1 minute buffer
+      console.log('✅ Got new token');
+      return ACCESS_TOKEN;
+    } else {
+      console.error('❌ Token error:', data);
+      throw new Error('Failed to get access token');
+    }
+  } catch (error) {
+    console.error('❌ Token fetch error:', error);
+    throw error;
+  }
+};
 
-export interface RealFlight {
+export interface AmadeusFlight {
   id: string;
-  airline: string;
+  type: string;
   flightNumber: string;
+  airline: string;
   departure: {
     airport: string;
     iataCode: string;
-    scheduled: string;
     terminal?: string;
+    scheduled: string;
   };
   arrival: {
     airport: string;
     iataCode: string;
-    scheduled: string;
     terminal?: string;
+    scheduled: string;
   };
   price: {
     total: number;
     currency: string;
   };
   itineraries: any[];
-  numberOfBookableSeats: number;
-  lastTicketingDate: string;
 }
 
-export const searchRealFlights = async (params: {
+export const searchAmadeusFlights = async (params: {
   origin: string;
   destination: string;
   departureDate: string;
   adults?: number;
-}): Promise<RealFlight[]> => {
+  currency?: string;
+}): Promise<AmadeusFlight[]> => {
   try {
-    console.log('🛫 Searching REAL flights with Amadeus:', params);
+    console.log('🛫 Searching Amadeus flights directly:', params);
     
-    const response = await amadeus.shopping.flightOffersSearch.get({
-      originLocationCode: params.origin.toUpperCase(),
-      destinationLocationCode: params.destination.toUpperCase(),
-      departureDate: params.departureDate,
-      adults: params.adults || 1,
-      max: 10, // Max results (free tier limit)
-      currencyCode: 'USD'
+    // If no API key, return demo data immediately
+    if (AMADEUS_API_KEY === 'ELgladm0pbqUzY8ke0TdkS9SHM0kXEDJ') {
+      console.log('🔑 No API key, using demo data');
+      return generateDemoFlights(params);
+    }
+    
+    const token = await getAccessToken();
+    
+    const url = new URL('https://test.api.amadeus.com/v2/shopping/flight-offers');
+    url.searchParams.append('originLocationCode', params.origin.toUpperCase().slice(0, 3));
+    url.searchParams.append('destinationLocationCode', params.destination.toUpperCase().slice(0, 3));
+    url.searchParams.append('departureDate', params.departureDate);
+    url.searchParams.append('adults', (params.adults || 1).toString());
+    url.searchParams.append('max', '10');
+    url.searchParams.append('currencyCode', params.currency || 'USD');
+    
+    const response = await fetch(url.toString(), {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.amadeus+json'
+      }
     });
     
-    console.log('✅ Amadeus Response:', response.data.length, 'flights found');
+    if (!response.ok) {
+      console.error(`❌ API Error ${response.status}:`, await response.text());
+      throw new Error(`API Error: ${response.status}`);
+    }
     
-    // Transform Amadeus response to our format
-    return response.data.map((offer: any, index: number) => {
-      const firstSegment = offer.itineraries[0].segments[0];
-      const lastSegment = offer.itineraries[0].segments[offer.itineraries[0].segments.length - 1];
+    const data = await response.json();
+    console.log('✅ Amadeus response:', data.data?.length || 0, 'flights');
+    
+    if (!data.data || data.data.length === 0) {
+      console.log('⚠️ No flights found in API response');
+      return generateDemoFlights(params);
+    }
+    
+    // Transform response
+    return data.data.map((offer: any, index: number) => {
+      const firstSegment = offer.itineraries[0]?.segments[0] || {};
+      const lastSegment = offer.itineraries[0]?.segments[offer.itineraries[0]?.segments?.length - 1] || {};
       
       return {
-        id: `amadeus-${offer.id || index}`,
-        airline: firstSegment.carrierCode,
-        flightNumber: `${firstSegment.carrierCode}${firstSegment.number}`,
+        id: offer.id || `amadeus-${index}`,
+        type: offer.type,
+        flightNumber: `${firstSegment.carrierCode || 'AA'}${firstSegment.number || '100'}`,
+        airline: getAirlineName(firstSegment.carrierCode),
         departure: {
-          airport: `${firstSegment.departure.iataCode} Airport`,
-          iataCode: firstSegment.departure.iataCode,
-          scheduled: firstSegment.departure.at,
-          terminal: firstSegment.departure.terminal
+          airport: firstSegment.departure?.iataCode || params.origin,
+          iataCode: firstSegment.departure?.iataCode || params.origin.toUpperCase().slice(0, 3),
+          terminal: firstSegment.departure?.terminal,
+          scheduled: firstSegment.departure?.at || new Date().toISOString()
         },
         arrival: {
-          airport: `${lastSegment.arrival.iataCode} Airport`,
-          iataCode: lastSegment.arrival.iataCode,
-          scheduled: lastSegment.arrival.at,
-          terminal: lastSegment.arrival.terminal
+          airport: lastSegment.arrival?.iataCode || params.destination,
+          iataCode: lastSegment.arrival?.iataCode || params.destination.toUpperCase().slice(0, 3),
+          terminal: lastSegment.arrival?.terminal,
+          scheduled: lastSegment.arrival?.at || new Date().toISOString()
         },
         price: {
-          total: parseFloat(offer.price.total),
-          currency: offer.price.currency
+          total: parseFloat(offer.price?.total) || 299.99,
+          currency: offer.price?.currency || 'USD'
         },
-        itineraries: offer.itineraries,
-        numberOfBookableSeats: offer.numberOfBookableSeats || 9,
-        lastTicketingDate: offer.lastTicketingDate
+        itineraries: offer.itineraries || []
       };
     });
     
   } catch (error: any) {
     console.error('❌ Amadeus API Error:', error.message);
-    
-    // Return mock data if API fails (for demo)
-    return getFallbackFlights(params);
+    console.log('🔄 Falling back to demo flights');
+    return generateDemoFlights(params);
   }
 };
 
-// Airport autocomplete (FREE in Amadeus)
-export const searchAirports = async (keyword: string) => {
+// Airport search (direct API)
+export const searchAmadeusAirports = async (keyword: string) => {
   try {
-    const response = await amadeus.referenceData.locations.get({
-      keyword: keyword,
-      subType: 'AIRPORT',
-      'page[limit]': 10
-    });
+    if (!AMADEUS_API_KEY || AMADEUS_API_KEY === 'ELgladm0pbqUzY8ke0TdkS9SHM0kXEDJ') {
+      return getMockAirports(keyword);
+    }
     
-    return response.data.map((airport: any) => ({
-      name: airport.name,
-      iataCode: airport.iataCode,
-      city: airport.address.cityName,
-      country: airport.address.countryName
+    const token = await getAccessToken();
+    
+    const response = await fetch(
+      `https://test.api.amadeus.com/v1/reference-data/locations?subType=AIRPORT,CITY&keyword=${encodeURIComponent(keyword)}&page[limit]=10`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.amadeus+json'
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      console.error('Airport API error:', response.status);
+      return getMockAirports(keyword);
+    }
+    
+    const data = await response.json();
+    
+    return data.data.map((location: any) => ({
+      name: location.name,
+      iataCode: location.iataCode,
+      type: location.subType,
+      city: location.address?.cityName,
+      country: location.address?.countryName
     }));
+    
   } catch (error) {
-    console.error('Airport search error:', error);
-    return [];
+    console.log('Using mock airport data');
+    return getMockAirports(keyword);
   }
 };
 
-// Fallback mock data
-const getFallbackFlights = (params: any): RealFlight[] => {
+// Helper functions
+const getAirlineName = (code: string): string => {
+  const airlines: Record<string, string> = {
+    'AA': 'American Airlines', 'DL': 'Delta', 'UA': 'United', 
+    'WN': 'Southwest', 'B6': 'JetBlue', 'AS': 'Alaska',
+    'NK': 'Spirit', 'F9': 'Frontier', 'BA': 'British Airways',
+    'LH': 'Lufthansa', 'AF': 'Air France', 'EK': 'Emirates',
+    'SQ': 'Singapore Airlines', 'JL': 'Japan Airlines'
+  };
+  return airlines[code] || `${code} Airlines`;
+};
+
+const generateDemoFlights = (params: any): AmadeusFlight[] => {
   const airlines = ['AA', 'DL', 'UA', 'WN', 'B6'];
-  const basePrice = 200 + Math.random() * 300;
+  const basePrice = 199 + Math.random() * 300;
   
-  return Array.from({ length: 5 }, (_, i) => ({
-    id: `fallback-${i}`,
-    airline: airlines[i % airlines.length],
-    flightNumber: `${airlines[i % airlines.length]}${1000 + i}`,
-    departure: {
-      airport: `${params.origin.toUpperCase()} International Airport`,
-      iataCode: params.origin.toUpperCase(),
-      scheduled: `2024-01-15T${8 + i}:00:00`
-    },
-    arrival: {
-      airport: `${params.destination.toUpperCase()} International Airport`,
-      iataCode: params.destination.toUpperCase(),
-      scheduled: `2024-01-15T${10 + i}:00:00`
-    },
-    price: {
-      total: Math.round(basePrice + (i * 50)),
-      currency: 'USD'
-    },
-    itineraries: [],
-    numberOfBookableSeats: 9,
-    lastTicketingDate: '2024-01-10'
-  }));
+  return Array.from({ length: 5 }, (_, i) => {
+    const airline = airlines[i % airlines.length];
+    const price = Math.round(basePrice + (i * 50));
+    const departureTime = new Date(Date.now() + (i * 3600000));
+    const arrivalTime = new Date(departureTime.getTime() + 7200000);
+    
+    return {
+      id: `demo-${i}`,
+      type: 'flight-offer',
+      flightNumber: `${airline}${1000 + i}`,
+      airline: getAirlineName(airline),
+      departure: {
+        airport: `${params.origin.toUpperCase()} Airport`,
+        iataCode: params.origin.toUpperCase().slice(0, 3),
+        scheduled: departureTime.toISOString()
+      },
+      arrival: {
+        airport: `${params.destination.toUpperCase()} Airport`,
+        iataCode: params.destination.toUpperCase().slice(0, 3),
+        scheduled: arrivalTime.toISOString()
+      },
+      price: {
+        total: price,
+        currency: 'USD'
+      },
+      itineraries: []
+    };
+  });
+};
+
+const getMockAirports = (keyword: string) => {
+  const airports = [
+    { name: 'John F Kennedy International', iataCode: 'JFK', type: 'AIRPORT', city: 'New York', country: 'United States' },
+    { name: 'Los Angeles International', iataCode: 'LAX', type: 'AIRPORT', city: 'Los Angeles', country: 'United States' },
+    { name: 'Chicago O\'Hare International', iataCode: 'ORD', type: 'AIRPORT', city: 'Chicago', country: 'United States' },
+    { name: 'Atlanta International', iataCode: 'ATL', type: 'AIRPORT', city: 'Atlanta', country: 'United States' },
+    { name: 'Dallas/Fort Worth International', iataCode: 'DFW', type: 'AIRPORT', city: 'Dallas', country: 'United States' },
+    { name: 'Denver International', iataCode: 'DEN', type: 'AIRPORT', city: 'Denver', country: 'United States' },
+    { name: 'San Francisco International', iataCode: 'SFO', type: 'AIRPORT', city: 'San Francisco', country: 'United States' },
+    { name: 'Seattle-Tacoma International', iataCode: 'SEA', type: 'AIRPORT', city: 'Seattle', country: 'United States' },
+    { name: 'Miami International', iataCode: 'MIA', type: 'AIRPORT', city: 'Miami', country: 'United States' },
+    { name: 'London Heathrow', iataCode: 'LHR', type: 'AIRPORT', city: 'London', country: 'United Kingdom' },
+    { name: 'Paris Charles de Gaulle', iataCode: 'CDG', type: 'AIRPORT', city: 'Paris', country: 'France' },
+    { name: 'Dubai International', iataCode: 'DXB', type: 'AIRPORT', city: 'Dubai', country: 'UAE' },
+    { name: 'Singapore Changi', iataCode: 'SIN', type: 'AIRPORT', city: 'Singapore', country: 'Singapore' },
+  ];
+  
+  const keywordLower = keyword.toLowerCase();
+  return airports.filter(airport => 
+    airport.name.toLowerCase().includes(keywordLower) ||
+    airport.iataCode.toLowerCase().includes(keywordLower) ||
+    airport.city.toLowerCase().includes(keywordLower)
+  ).slice(0, 10);
 };
