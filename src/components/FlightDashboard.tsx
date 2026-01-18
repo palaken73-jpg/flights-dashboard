@@ -86,6 +86,7 @@ const FlightDashboard: React.FC = () => {
                 <TableCell>Flight</TableCell>
                 <TableCell>Airline</TableCell>
                 <TableCell>Route</TableCell>
+                <TableCell align="center">Source</TableCell>
                 <TableCell align="right">Price</TableCell>
                 <TableCell align="center">Status</TableCell>
               </TableRow>
@@ -99,6 +100,9 @@ const FlightDashboard: React.FC = () => {
                   <TableCell>{flight.airline}</TableCell>
                   <TableCell>
                     {flight.from} → {flight.to}
+                  </TableCell>
+                  <TableCell align="center">
+                  <Chip  label={flight.data_source || flight.source || "api"} color={(flight.data_source || flight.source) === "api" ? "success" : "default"} size="small"/>
                   </TableCell>
                   <TableCell align="right">
                     <Typography variant="h6" color="primary">
