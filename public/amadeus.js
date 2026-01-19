@@ -29,8 +29,8 @@ const options = {
       });
       const tokenData = await tokenRes.json();
       
-      const flightRes = await fetch(
-        `https://test.api.amadeus.com/v2/shopping/flight-offers?originLocationCode=${origin}&destinationLocationCode=${destination}&departureDate=2024-01-20`,
+     const flightRes = await fetch(
+        `https://test.api.amadeus.com/v2/shopping/flight-offers?originLocationCode=${origin}&destinationLocationCode=${destination}&departureDate=2026-01-20&adults=1&max=5`,
         {
           headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
         }
