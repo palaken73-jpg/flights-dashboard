@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import ReactDOM from 'react-dom/client';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
@@ -11,48 +12,64 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Chip from '@mui/material/Chip';
-import CircularProgress from '@mui/material/CircularProgress';
-import SearchIcon from '@mui/icons-material/Search';
 
-const FlightDashboard: React.FC = () => {
-  const [flights, setFlights] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+const FlightDashboard = () => {
+  const [flights, setFlights] = useState([
+    { id: 1, flight: 'AA123', airline: 'American', from: 'JFK', to: 'LAX', price: 299, source: 'demo' },
+    { id: 2, flight: 'DL456', airline: 'Delta', from: 'LAX', to: 'JFK', price: 345, source: 'demo' },
+  ]);
   const [search, setSearch] = useState({ origin: '', destination: '' });
-
-  useEffect(() => {
-    loadFlights();
-  }, []);
-
-  const loadFlights = async () => {
-    setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setFlights([
-      { id: '1', flight: 'AA123', airline: 'American', from: 'JFK', to: 'LAX', price: 299 },
-      { id: '2', flight: 'DL456', airline: 'Delta', from: 'LAX', to: 'JFK', price: 345 },
-      { id: '3', flight: 'UA789', airline: 'United', from: 'SFO', to: 'ORD', price: 289 },
-    ]);
-    setLoading(false);
-  };
+  const [apiStatus, setApiStatus] = useState('');
 
   const handleSearch = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setFlights([
-        { id: '1', flight: 'AA123', airline: 'American', from: search.origin || 'JFK', to: search.destination || 'LAX', price: 299 },
-        { id: '2', flight: 'DL456', airline: 'Delta', from: search.origin || 'JFK', to: search.destination || 'LAX', price: 345 },
-      ]);
-      setLoading(false);
-    }, 800);
+    setFlights([
+      { id: 1, flight: 'AA123', airline: 'American', from: search.origin || 'JFK', to: search.destination || 'LAX', price: 299, source: 'demo' },
+      { id: 2, flight: 'DL456', airline: 'Delta', from: search.origin || 'JFK', to: search.destination || 'LAX', price: 345, source: 'demo' },
+    ]);
+  };
+
+  const testAmadeus = async () => {
+    setApiStatus('Loading...');
+    
+    // @ts-ignore - AmadeusAPI is in public/amadeus.js
+    const result = await window.AmadeusAPI?.getFlights('JFK', 'LAX');
+    
+    if(!result || result.demo) {
+      setApiStatus('Demo mode - Add API key in public/amadeus.js');
+      setFlights(prev => [...prev, {
+        id: prev.length + 1,
+        flight: 'AM123',
+        airline: 'Amadeus API',
+        from: 'JFK',
+        to: 'LAX', 
+        price: 399,
+        source: 'api-demo'
+      }]);
+    } else if(result.data) {
+      setApiStatus(`✅ Got ${result.data.length} real flights!`);
+      result.data.forEach((offer: any, i: number) => {
+        const segment = offer.itineraries[0]?.segments[0];
+        setFlights(prev => [...prev, {
+          id: prev.length + 1,
+          flight: `${segment?.carrierCode}${segment?.number}`,
+          airline: segment?.carrierCode || 'Airline',
+          from: segment?.departure?.iataCode || 'JFK',
+          to: segment?.arrival?.iataCode || 'LAX',
+          price: offer.price?.total || 399,
+          source: 'api-real'
+        }]);
+      });
+    }
   };
 
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
-        Flight Dashboard
+        ✈️ Flight Dashboard
       </Typography>
       
       <Paper sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'center' }}>
           <TextField 
             label="From" 
             value={search.origin}
@@ -65,20 +82,25 @@ const FlightDashboard: React.FC = () => {
             onChange={(e) => setSearch({...search, destination: e.target.value})}
             placeholder="LAX"
           />
-          <Button
-            variant="contained"
-            onClick={handleSearch}
-            disabled={loading}
-            startIcon={loading ? <CircularProgress size={20} /> : <SearchIcon />}
+          <Button variant="contained" onClick={handleSearch}>
+            Search
+          </Button>
+          
+          <Button 
+            variant="contained" 
+            color="success"
+            onClick={testAmadeus}
           >
-            {loading ? 'Searching...' : 'Search'}
+            Test Amadeus API
           </Button>
         </Box>
-
-        <Typography variant="h6" gutterBottom>
-          Available Flights ({flights.length})
-        </Typography>
-
+        
+        {apiStatus && (
+          <Typography color="primary" sx={{ mb: 2 }}>
+            {apiStatus}
+          </Typography>
+        )}
+        
         <TableContainer>
           <Table>
             <TableHead>
@@ -86,9 +108,8 @@ const FlightDashboard: React.FC = () => {
                 <TableCell>Flight</TableCell>
                 <TableCell>Airline</TableCell>
                 <TableCell>Route</TableCell>
+                <TableCell>Price</TableCell>
                 <TableCell align="center">Source</TableCell>
-                <TableCell align="right">Price</TableCell>
-                <TableCell align="center">Status</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -101,16 +122,20 @@ const FlightDashboard: React.FC = () => {
                   <TableCell>
                     {flight.from} → {flight.to}
                   </TableCell>
-                  <TableCell align="center">
-                  <Chip  label={flight.data_source || flight.source || "api"} color={(flight.data_source || flight.source) === "api" ? "success" : "default"} size="small"/>
-                  </TableCell>
-                  <TableCell align="right">
+                  <TableCell>
                     <Typography variant="h6" color="primary">
                       ${flight.price}
                     </Typography>
                   </TableCell>
                   <TableCell align="center">
-                    <Chip label="Available" color="success" size="small" />
+                    <Chip 
+                      label={flight.source} 
+                      color={
+                        flight.source === 'api-real' ? 'success' : 
+                        flight.source === 'api-demo' ? 'warning' : 'default'
+                      } 
+                      size="small" 
+                    />
                   </TableCell>
                 </TableRow>
               ))}
@@ -122,4 +147,7 @@ const FlightDashboard: React.FC = () => {
   );
 };
 
-export default FlightDashboard;
+const root = ReactDOM.createRoot(
+  document.getElementById('root') as HTMLElement
+);
+root.render(<FlightDashboard />);
