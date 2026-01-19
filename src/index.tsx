@@ -21,18 +21,11 @@ const FlightDashboard = () => {
   const [search, setSearch] = useState({ origin: '', destination: '' });
   const [apiStatus, setApiStatus] = useState('');
 
-  const handleSearch = () => {
-    setFlights([
-      { id: 1, flight: 'AA123', airline: 'American', from: search.origin || 'JFK', to: search.destination || 'LAX', price: 299, source: 'demo' },
-      { id: 2, flight: 'DL456', airline: 'Delta', from: search.origin || 'JFK', to: search.destination || 'LAX', price: 345, source: 'demo' },
-    ]);
-  };
-
   const testAmadeus = async () => {
     setApiStatus('Loading...');
     
     // @ts-ignore - AmadeusAPI is in public/amadeus.js
-    const result = await window.AmadeusAPI?.getFlights('JFK', 'LAX');
+    const result = await window.AmadeusAPI?.getFlights( search.origin, search.destination);
     
     if(!result || result.demo) {
       setApiStatus('Demo mode - Add API key in public/amadeus.js');
@@ -65,7 +58,7 @@ const FlightDashboard = () => {
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
-        ✈️ Flight Dashboard
+        Flight Dashboard
       </Typography>
       
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -74,18 +67,15 @@ const FlightDashboard = () => {
             label="From" 
             value={search.origin}
             onChange={(e) => setSearch({...search, origin: e.target.value})}
-            placeholder="JFK"
+            placeholder='JFK'
+           
           />
           <TextField 
             label="To" 
             value={search.destination}
             onChange={(e) => setSearch({...search, destination: e.target.value})}
-            placeholder="LAX"
+            placeholder='SEA'
           />
-          <Button variant="contained" onClick={handleSearch}>
-            Search
-          </Button>
-          
           <Button 
             variant="contained" 
             color="success"
@@ -94,9 +84,20 @@ const FlightDashboard = () => {
             Test Amadeus API
           </Button>
         </Box>
-        
+        <Typography variant="h5" gutterBottom> Please note that the site is in beta, please make sure to use IATA codes in ALL CAPS.
+
+          examples to use:
+          <ul>
+          <li>-SEA</li> 
+          <li>-JFK</li>
+          <li> -ATL</li>
+          <li>-LAX</li>
+          <li>-ORD</li> 
+          </ul>
+        </Typography>
         {apiStatus && (
-          <Typography color="primary" sx={{ mb: 2 }}>
+          <Typography color="primary" sx={{ mb: 0.5
+           }}>
             {apiStatus}
           </Typography>
         )}

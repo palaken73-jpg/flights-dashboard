@@ -14,6 +14,7 @@ window.AmadeusAPI = {
     }
 const url = `https://test.api.amadeus.com/v2/shopping/flight-offers?originLocationCode=JFK&destinationLocationCode=LAX&departureDate=2025-01-20&adults=1&max=5`;
 
+
 // Add Authorization header (if making direct fetch)
 const options = {
   headers: {
@@ -30,7 +31,7 @@ const options = {
       const tokenData = await tokenRes.json();
       
       const flightRes = await fetch(
-        `https://test.api.amadeus.com/v2/shopping/flight-offers?originLocationCode=${origin}&destinationLocationCode=${destination}&departureDate=2024-01-20`,
+        `https://test.api.amadeus.com/v2/shopping/flight-offers?originLocationCode=${origin}&destinationLocationCode=${destination}&departureDate=2026-01-20&adults=1&max=5`,
         {
           headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
         }
